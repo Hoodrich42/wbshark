@@ -52,13 +52,53 @@ class DbRequest():
         connection.close()
         return sales_today
 
-    def select_cancel_today(self, tg_id):
+    def select_cancel_today(self, telegram_id):
         connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
         sql_query = "SELECT cancel_today FROM shark_table WHERE telegram_id = %s"
-        values = (str(tg_id),)
+        values = (str(telegram_id),)
         with connection.cursor() as cursor:
             cursor.execute(sql_query, values)
             cancel_today = cursor.fetchall()[0][0]
             connection.commit()
         connection.close()
         return cancel_today
+
+    def select_api_key(self, telegram_id):
+        connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
+        sql_query = "SELECT api_key FROM shark_table WHERE telegram_id = %s"
+        values = (str(telegram_id),)
+        with connection.cursor() as cursor:
+            cursor.execute(sql_query, values)
+            api_keys_list = cursor.fetchall()[0][0]
+            connection.commit()
+        connection.close()
+        return api_keys_list
+
+    def update_api_key(self, telegram_id, api_key):
+        connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
+        sql_query = "UPDATE shark_table SET api_key = %s WHERE telegram_id = %s"
+        values = (api_key, str(telegram_id))
+        with connection.cursor() as cursor:
+            cursor.execute(sql_query, values)
+            connection.commit()
+        connection.close()
+
+    def select_ip_name(self, telegram_id):
+        connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
+        sql_query = "SELECT ip_name FROM shark_table WHERE telegram_id = %s"
+        values = (str(telegram_id),)
+        with connection.cursor() as cursor:
+            cursor.execute(sql_query, values)
+            api_keys_list = cursor.fetchall()[0][0]
+            connection.commit()
+        connection.close()
+        return api_keys_list
+
+    def update_ip_name(self, telegram_id, api_key):
+        connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
+        sql_query = "UPDATE shark_table SET ip_name = %s WHERE telegram_id = %s"
+        values = (api_key, str(telegram_id))
+        with connection.cursor() as cursor:
+            cursor.execute(sql_query, values)
+            connection.commit()
+        connection.close()

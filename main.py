@@ -31,6 +31,9 @@ def check_request(response):
         fl_api = True
     return msg, fl_api
 
+def check_notifications():
+    pass
+
 
 @bot.message_handler(commands=['start'])
 def startt(message):
@@ -65,10 +68,11 @@ def startt(message):
 @bot.message_handler(content_types=['text'])
 def add_api_key(message):
     all_users = db_query.select_all()
+    telegram_id = message.from_user.id
 
     reg = False
     for user in all_users:
-        if str(message.from_user.id) == user[0]:
+        if str(telegram_id) == user[0]:
             reg = True
 
     if reg:
@@ -76,8 +80,61 @@ def add_api_key(message):
         orders_today = api_query.get_orders(api_key, 'today')
         msg, fl_orders_today = check_request(orders_today)
         if fl_orders_today:
-            ip_name = api_query.api_ip(225816980, api_key)
-            bot.send_message(message.chat.id, ip_name)
+            nm_id = orders_today[0]['nmId']
+            ip_name = api_query.api_ip(nm_id, api_key)
+            api_keys_list = db_query.select_api_key(telegram_id).split('|')
+            ip_names_list = db_query.select_ip_name(telegram_id).split('|')
+            print(api_keys_list)
+            if api_keys_list[0] == 'none' or api_keys_list[1] == 'none':
+                confirm_marup = types.InlineKeyboardMarkup()
+                if api_keys_list[0] == 'none':
+                    new_api_key = f'{api_key}*|none'
+                    new_ip_name = f'{ip_name}*|none'
+                elif api_keys_list[1] == 'none':
+                    new_api_key = f'{api_keys_list[0]}|{api_key}*'
+                    new_ip_name = f'{ip_names_list[0]}|{ip_name}*'
+                db_query.update_ip_name(telegram_id, new_ip_name)
+                db_query.update_api_key(telegram_id, new_api_key)
+                btn1 = types.InlineKeyboardButton('Да', callback_data='confirm_api_key')
+                btn2 = types.InlineKeyboardButton('Нет', callback_data='cancel_api_key')
+                confirm_marup.add(btn1, btn2)
+                bot.send_message(message.chat.id, text=f'{ip_name}\n\nДобавить API ключ?', reply_markup=confirm_marup)
+            else:
+                bot.send_message(message.chat.id, text=f'У вас уже активировано 2 API ключа')
+        else:
+            bot.send_message(message.chat.id, text=f'Неудается получить доступ к статистике\n\nПроверьте правильность API ключа или повторите попытку через пару минут')
 
+
+@bot.callback_query_handler(func=lambda call: True)
+def query_handler(call):
+    data = call.data.split(':')
+    telegram_id = call.from_user.id
+    if data[0] == 'confirm_api_key':
+        api_keys_list = db_query.select_api_key(telegram_id).split('|')
+        ip_names_list = db_query.select_ip_name(telegram_id).split('|')
+        if '*' in api_keys_list[0]:
+            api_keys_list[0] = api_keys_list[0].split('*')[0]
+            ip_names_list[0] = ip_names_list[0].split('*')[0]
+        elif '*' in api_keys_list[1]:
+            api_keys_list[1] = api_keys_list[1].split('*')[0]
+            ip_names_list[1] = ip_names_list[1].split('*')[0]
+        db_query.update_api_key(telegram_id, f'{api_keys_list[0]}|{api_keys_list[1]}')
+        db_query.update_ip_name(telegram_id, f'{ip_names_list[0]}|{ip_names_list[1]}')
+        msg = '✅ Вы успешно подключились!\n\n' \
+              '🕒 Как только появится новый заказ, WB Order Bot соберет статистику и пришлет уведомление.'
+        bot.edit_message_text(msg, call.message.chat.id, call.message.message_id)
+
+    if data[0] == 'cancel_api_key':
+        api_keys_list = db_query.select_api_key(telegram_id).split('|')
+        ip_names_list = db_query.select_ip_name(telegram_id).split('|')
+        if '*' in api_keys_list[0]:
+            api_keys_list[0] = 'none'
+            ip_names_list[0] = 'none'
+        elif '*' in api_keys_list[1]:
+            api_keys_list[1] = 'none'
+            ip_names_list[1] = 'none'
+        db_query.update_api_key(telegram_id, f'{api_keys_list[0]}|{api_keys_list[1]}')
+        db_query.update_ip_name(telegram_id, f'{ip_names_list[0]}|{ip_names_list[1]}')
+        bot.edit_message_text('Запрос отменен', call.message.chat.id, call.message.message_id)
 
 bot.polling(non_stop=True, interval=0)

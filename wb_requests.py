@@ -102,6 +102,6 @@ class ApiRequest:
         if date == 'today':
             date_from = self.get_today_date()
         headers = self.get_header(api_key)
-        url = f'https://statistics-api.wildberries.ru/api/v1/supplier/orders?dateFrom={self.date_from}'
+        url = f'https://statistics-api.wildberries.ru/api/v1/supplier/orders?dateFrom={date_from}'
         response = self.session.get(url, headers=headers).json()
         return response
