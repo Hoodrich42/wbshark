@@ -1,6 +1,8 @@
 import telebot
 from telebot import types
+import threading
 import time
+from notifications import Notifications
 from dotenv import load_dotenv
 from db_requests import *
 from wb_requests import *
@@ -12,6 +14,7 @@ bot = telebot.TeleBot(bot_token)
 
 db_query = DbRequest()
 api_query = ApiRequest()
+notifications = Notifications()
 
 def check_request(response):
     fl_api = False
@@ -32,7 +35,18 @@ def check_request(response):
     return msg, fl_api
 
 def check_notifications():
-    pass
+    while True:
+        all_users = db_query.select_all()
+        for user in all_users:
+            telegram_id = user[0]
+            api_keys_list = user[1].split('|')
+            for api_key in api_keys_list:
+                api_key_number = api_keys_list.index(api_key)
+                response = notifications.order_cheking('cancel', telegram_id, api_key_number, api_key)
+                print(len(response))
+                #bot.send_message(telegram_id, response)
+                time.sleep(100)
+        time.sleep(5)
 
 
 @bot.message_handler(commands=['start'])
@@ -137,4 +151,5 @@ def query_handler(call):
         db_query.update_ip_name(telegram_id, f'{ip_names_list[0]}|{ip_names_list[1]}')
         bot.edit_message_text('Запрос отменен', call.message.chat.id, call.message.message_id)
 
+thread1 = threading.Thread(target=check_notifications).start()
 bot.polling(non_stop=True, interval=0)
