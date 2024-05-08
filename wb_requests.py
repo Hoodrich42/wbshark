@@ -103,6 +103,8 @@ class ApiRequest:
 
     def get_orders(self, api_key, date):
         today_date = self.get_today_date()
+        if date == 'today':
+            date_from = self.get_today_date()
         if date == '30_days':
             date_from = self.get_month_ago_date()
         elif date == '3_month':

@@ -1,12 +1,32 @@
 from db_requests import *
 from wb_requests import *
 from datetime import timedelta, date
+import pandas as pd
+import telebot
+
+bot_token = os.getenv('TOKEN')
+bot = telebot.TeleBot(bot_token)
 
 db_query = DbRequest()
 api_query = ApiRequest()
 
 
 class Notifications:
+
+    @staticmethod
+    def get_comission():
+        dict_categories = {}
+        comission_file = pd.ExcelFile('сomission.xlsx')
+        comission_file = comission_file.parse()
+        for i in comission_file['Категория']:
+            if i in dict_categories.keys():
+                pass
+            else:
+                if not pd.isnull(i):
+                    dict_categories[i] = comission_file.loc[comission_file['Категория'] == i, 'Склад WB, %'].unique()[0]
+        return dict_categories
+
+    dict_categories = get_comission()
 
     @staticmethod
     def get_item_data(item):
@@ -158,10 +178,52 @@ class Notifications:
                 sum_from_klient += stock_item['inWayFromClient']
         return all_sklad, summ, sum_to_klient, sum_from_klient
 
+    @staticmethod
+    def rezerv_calculate(orders_rezerv, nm_id, summ, rezerv_days):
+        count_rezerv = 0
+        for i in range(len(orders_rezerv)):
+            if orders_rezerv[i]['nmId'] == nm_id:
+                count_rezerv += 1
+
+        rezerv_kolich = count_rezerv / 30 * rezerv_days - summ
+        if rezerv_kolich < 0:
+            rezerv_kolich = 0
+        return rezerv_kolich
+
+    @staticmethod
+    def get_msg_plus(items_today, today_list, nm_id, comission):
+        # Склеиваем заказы с одинаковым артикулом
+        msg_plus = '\n\n➕ в том числе 👇🏻\n\n'
+        count_plus = 0
+        for i in range(len(items_today)):
+            if nm_id == items_today[i]['nmId'] and not items_today[i]['srid'] in today_list:
+                count_plus += 1
+                today_list.append(items_today[i]['srid'])
+                date_order_for_msg_plus = f'{items_today[i]["date"].split("T")[0].split("-")[2]}.' \
+                                          f'{items_today[i]["date"].split("T")[0].split("-")[1]}.' \
+                                          f'{items_today[i]["date"].split("T")[0].split("-")[0]} ' \
+                                          f'{items_today[i]["date"].split("T")[1]}'
+                address_plus = f'🌐 {items_today[i]["warehouseName"]} → {items_today[i]["regionName"]}'
+                msg_plus += f'{date_order_for_msg_plus}\n' \
+                            f'🛒Заказ[{len(today_list)}]: {int(items_today[i]["priceWithDisc"])}₽\n' \
+                            f'💼 Комиссия (базовая): {comission}%\n' \
+                            f'{address_plus}\n\n'
+                if count_plus == 4:
+                    break
+
+        if count_plus == 0:
+            msg_plus = ''
+
+        return msg_plus
+
     def order_cheking(self, type, telegram_id, api_key_number, api_key):
         orders_3_month = api_query.get_orders(api_key, '3_month')
+        print(orders_3_month)
         sales_3_month = api_query.get_sales(api_key, '3_month')
+        print(sales_3_month)
         stock = api_query.get_stock(api_key)
+        rezerv_days = db_query.select_rezerv(telegram_id)
+        ip_name = db_query.select_ip_name(telegram_id).split('|')
 
         today_date = self.get_today_date()
         month_ago_dates = self.get_month_ago_dates()
@@ -169,25 +231,31 @@ class Notifications:
 
         orders_1_month = []
         for order in orders_3_month:
+
             if order['date'].split('T')[0] in month_ago_dates:
                 orders_1_month.append(order)
 
         if type == 'order':
-            today_list = db_query.select_orders_today(telegram_id).split('|')[api_key_number].split(',')
+            today_list_full = db_query.select_orders_today(telegram_id).split('|')
+            today_list = today_list_full[api_key_number].split(',')
             items_list_today, items_list_yesterday = self.get_items_lists(orders_3_month)
         elif type == 'sale':
-            today_list = db_query.select_sales_today(telegram_id).split('|')[api_key_number].split(',')
+            today_list_full = db_query.select_sales_today(telegram_id).split('|')
+            today_list = today_list_full[api_key_number].split(',')
             items_list_today, items_list_yesterday = self.get_items_lists(sales_3_month)
         elif type == 'cancel':
-            today_list = db_query.select_cancel_today(telegram_id).split('|')[api_key_number].split(',')
+            today_list_full = db_query.select_cancel_today(telegram_id).split('|')
+            today_list = today_list_full[api_key_number].split(',')
             canceled_3_month = self.get_cancel_list(orders_3_month, sales_3_month)
             items_list_today, items_list_yesterday = self.get_items_lists(canceled_3_month)
 
         for item in items_list_today:
+            print('тут')
             nm_id, order_number, date_order, subject, barcode, category, brand, \
                 amount, supplier_article, address, date_order_for_msg = self.get_item_data(item)
 
             if not order_number in today_list:
+                print('тут')
                 if 'none' in today_list:
                     today_list = [order_number]
                 else:
@@ -211,8 +279,65 @@ class Notifications:
                 # Получаем остатки товара
                 all_sklad, summ, sum_to_klient, sum_from_klient = self.check_stock(stock, nm_id)
 
+                # Комиссия
+                try:
+                    comission = self.dict_categories[f"{category}"]
+                except:
+                    comission = 0
+
                 # Резерв
-                rezerv_kolich = rezerv_calculate(orders_1_month, nm_id, summ, rezerv_days)
+                rezerv_kolich = self.rezerv_calculate(orders_1_month, nm_id, summ, rezerv_days)
 
+                msg_plus = self.get_msg_plus(items_list_today, today_list, nm_id, comission)
 
-        return canceled_3_month
+                # Обновляем список заказов за сегодня в базе данных
+                updated_items_today = ''
+                for i in range(len(today_list)):
+                    if i + 1 == len(today_list):
+                        updated_items_today += f'{today_list[i]}'
+                    else:
+                        updated_items_today += f'{today_list[i]},'
+
+                today_list_full[api_key_number] = updated_items_today
+
+                updated_items_today_list = ''
+                for i in range(len(today_list_full)):
+                    if i + 1 == len(today_list_full):
+                        updated_items_today_list += f'{today_list_full[i]}'
+                    else:
+                        updated_items_today_list += f'{today_list_full[i]}|'
+
+                if type == 'order':
+                    db_query.update_orders_today(updated_items_today_list, telegram_id)
+                    third_str = f'🛒Заказ[{items_count}]: {amount}₽\n'
+                if type == 'sale':
+                    db_query.update_sales_today(updated_items_today_list, telegram_id)
+                    third_str = f'✅ Выкуп[{items_count}]: {amount}₽\n'
+                if type == 'cancel':
+                    db_query.update_cancel_today(updated_items_today_list, telegram_id)
+                    third_str = f'🚫 Отмена[{items_count}]: {amount}₽\n'
+
+                msg = f'{ip_name[api_key_number]}\n\n' \
+                      f'{date_order_for_msg}\n' \
+                      f'{third_str}' \
+                      f'📈 Сегодня: {all_today}\n' \
+                      f'🆔 Арт: <a href="https://www.wildberries.ru/catalog/{nm_id}/detail.aspx?targetUrl=XS">{nm_id}</a>\n' \
+                      f'📁{subject}\n' \
+                      f'🏷{brand} \ <a href="https://www.wildberries.ru/catalog/{nm_id}/detail.aspx?targetUrl=XS">{supplier_article}</a>\n' \
+                      f'#️⃣ Баркод: {barcode}\n' \
+                      f'⭐️ Рейтинг: {rate}\n' \
+                      f'💬 Отзывы: {reviews}\n' \
+                      f'💵 Сегодня таких: {cur_artikul_today}\n' \
+                      f'💶 Вчера таких: {cur_artikul_yesterday}\n' \
+                      f'{abc_analyz}' \
+                      f'💼 Комиссия (базовая): {comission}%\n' \
+                      f'{vykup}' \
+                      f'{address}\n' \
+                      f'🚛 В пути до клиента: {sum_to_klient}\n' \
+                      f'🚚 В пути возвраты: {sum_from_klient}\n\n' \
+                      f'{all_sklad}' \
+                      f'📦 Всего: {summ}\n' \
+                      f'🚗 Пополните склад на {int(rezerv_kolich)} шт.' \
+                      f'{msg_plus}'
+
+                bot.send_message(telegram_id, msg)

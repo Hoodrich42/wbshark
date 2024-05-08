@@ -41,6 +41,15 @@ class DbRequest():
         connection.close()
         return orders_today
 
+    def update_orders_today(self, orders_today, telegram_id):
+        connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
+        sql_query = "UPDATE shark_table SET orders_today = %s WHERE telegram_id = %s"
+        values = (orders_today, str(telegram_id))
+        with connection.cursor() as cursor:
+            cursor.execute(sql_query, values)
+            connection.commit()
+        connection.close()
+
     def select_sales_today(self, telegram_id):
         connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
         sql_query = "SELECT sales_today FROM shark_table WHERE telegram_id = %s"
@@ -51,6 +60,15 @@ class DbRequest():
             connection.commit()
         connection.close()
         return sales_today
+
+    def update_sales_today(self, sales_today, telegram_id):
+        connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
+        sql_query = "UPDATE shark_table SET sales_today = %s WHERE telegram_id = %s"
+        values = (sales_today, str(telegram_id))
+        with connection.cursor() as cursor:
+            cursor.execute(sql_query, values)
+            connection.commit()
+        connection.close()
 
     def select_cancel_today(self, telegram_id):
         connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
@@ -63,6 +81,15 @@ class DbRequest():
         connection.close()
         return cancel_today
 
+    def update_cancel_today(self, cancel_today, telegram_id):
+        connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
+        sql_query = "UPDATE shark_table SET cancel_today = %s WHERE telegram_id = %s"
+        values = (cancel_today, str(telegram_id))
+        with connection.cursor() as cursor:
+            cursor.execute(sql_query, values)
+            connection.commit()
+        connection.close()
+
     def select_api_key(self, telegram_id):
         connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
         sql_query = "SELECT api_key FROM shark_table WHERE telegram_id = %s"
@@ -74,7 +101,7 @@ class DbRequest():
         connection.close()
         return api_keys_list
 
-    def update_api_key(self, telegram_id, api_key):
+    def update_api_key(self, api_key, telegram_id):
         connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
         sql_query = "UPDATE shark_table SET api_key = %s WHERE telegram_id = %s"
         values = (api_key, str(telegram_id))
@@ -94,10 +121,30 @@ class DbRequest():
         connection.close()
         return api_keys_list
 
-    def update_ip_name(self, telegram_id, api_key):
+    def update_ip_name(self, api_key, telegram_id):
         connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
         sql_query = "UPDATE shark_table SET ip_name = %s WHERE telegram_id = %s"
         values = (api_key, str(telegram_id))
+        with connection.cursor() as cursor:
+            cursor.execute(sql_query, values)
+            connection.commit()
+        connection.close()
+
+    def select_rezerv(self, telegram_id):
+        connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
+        sql_query = "SELECT rezerv FROM shark_table WHERE telegram_id = %s"
+        values = (str(telegram_id),)
+        with connection.cursor() as cursor:
+            cursor.execute(sql_query, values)
+            rezerv = cursor.fetchall()[0][0]
+            connection.commit()
+        connection.close()
+        return rezerv
+
+    def update_rezerv(self, new_rezerv, telegram_id):
+        connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
+        sql_query = "UPDATE shark_table SET rezerv = %s WHERE telegram_id = %s"
+        values = (new_rezerv, str(telegram_id))
         with connection.cursor() as cursor:
             cursor.execute(sql_query, values)
             connection.commit()
