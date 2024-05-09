@@ -16,37 +16,37 @@ class ApiRequest:
     @staticmethod
     def get_today_date():
         today_date = date.today()
-        return today_date
+        return str(today_date)
 
     @staticmethod
     def get_yesterday_date():
         today_date = date.today()
         yesterday_date = today_date - timedelta(days=1)
-        return yesterday_date
+        return str(yesterday_date)
 
     @staticmethod
     def get_week_ago_date():
         today_date = date.today()
         week_ago_date = today_date - timedelta(days=7)
-        return week_ago_date
+        return str(week_ago_date)
 
     @staticmethod
     def get_month_ago_date():
         today_date = date.today()
         month_ago_date = today_date - timedelta(days=30)
-        return month_ago_date
+        return str(month_ago_date)
 
     @staticmethod
     def get_3_month_ago_date():
         today_date = date.today()
         month_3_ago_date = today_date - timedelta(days=90)
-        return month_3_ago_date
+        return str(month_3_ago_date)
 
     @staticmethod
     def get_6_month_ago_date():
         today_date = date.today()
         month_6_ago_date = today_date - timedelta(days=180)
-        return month_6_ago_date
+        return str(month_6_ago_date)
 
     @staticmethod
     def get_basket(short_id):
@@ -111,6 +111,7 @@ class ApiRequest:
             date_from = self.get_3_month_ago_date()
         headers = self.get_header(api_key)
         url = f'https://statistics-api.wildberries.ru/api/v1/supplier/orders?dateFrom={date_from}&dateTo={today_date}'
+        print(url)
         response = self.session.get(url, headers=headers).json()
         return response
 

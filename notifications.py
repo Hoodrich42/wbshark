@@ -50,13 +50,13 @@ class Notifications:
     @staticmethod
     def get_today_date():
         today_date = date.today()
-        return today_date
+        return str(today_date)
 
     @staticmethod
     def get_yesterday_date():
         today_date = date.today()
         yesterday_date = today_date - timedelta(days=1)
-        return yesterday_date
+        return str(yesterday_date)
 
     @staticmethod
     def get_month_ago_dates():
@@ -218,20 +218,15 @@ class Notifications:
 
     def order_cheking(self, type, telegram_id, api_key_number, api_key):
         orders_3_month = api_query.get_orders(api_key, '3_month')
-        print(orders_3_month)
         sales_3_month = api_query.get_sales(api_key, '3_month')
-        print(sales_3_month)
         stock = api_query.get_stock(api_key)
-        rezerv_days = db_query.select_rezerv(telegram_id)
+        rezerv_days = int(db_query.select_rezerv(telegram_id).split('|')[api_key_number])
         ip_name = db_query.select_ip_name(telegram_id).split('|')
 
-        today_date = self.get_today_date()
         month_ago_dates = self.get_month_ago_dates()
-        yesterday_date = self.get_yesterday_date()
 
         orders_1_month = []
         for order in orders_3_month:
-
             if order['date'].split('T')[0] in month_ago_dates:
                 orders_1_month.append(order)
 
@@ -250,12 +245,10 @@ class Notifications:
             items_list_today, items_list_yesterday = self.get_items_lists(canceled_3_month)
 
         for item in items_list_today:
-            print('тут')
             nm_id, order_number, date_order, subject, barcode, category, brand, \
                 amount, supplier_article, address, date_order_for_msg = self.get_item_data(item)
 
-            if not order_number in today_list:
-                print('тут')
+            if order_number not in today_list:
                 if 'none' in today_list:
                     today_list = [order_number]
                 else:
@@ -340,4 +333,4 @@ class Notifications:
                       f'🚗 Пополните склад на {int(rezerv_kolich)} шт.' \
                       f'{msg_plus}'
 
-                bot.send_message(telegram_id, msg)
+                bot.send_photo(telegram_id, img, msg, parse_mode='html')
