@@ -191,6 +191,38 @@ class Notifications:
         return rezerv_kolich
 
     @staticmethod
+    def update_item_tooday(today_items_list, telegram_id, m, type_response):
+        # Делаем проверку чтобы очистить tovary_zakaz_today
+        if len(today_items_list) > 0:
+            fl_update_item = True
+            if type_response == 'order':
+                tovary_today = db_query.select_orders_today(telegram_id).split('|')
+            elif type_response == 'sale':
+                tovary_today = db_query.select_sales_today(telegram_id).split('|')
+            elif type_response == 'cancel':
+                tovary_today = db_query.select_cancel_today(telegram_id).split('|')
+            items_today_list = tovary_today[m].split(',')
+            for item in today_items_list:
+                order_number = item['srid']
+                if order_number in items_today_list:
+                    fl_update_item = False
+            if fl_update_item:
+                update_dannye_item = 'none'
+                tovary_today[m] = update_dannye_item
+                update_item = ''
+                for i in range(len(tovary_today)):
+                    if i + 1 == len(tovary_today):
+                        update_item += f'{tovary_today[i]}'
+                    else:
+                        update_item += f'{tovary_today[i]}|'
+                if type_response == 'order':
+                    db_query.update_orders_today(update_item, telegram_id)
+                elif type_response == 'sale':
+                    db_query.update_sales_today(update_item, telegram_id)
+                elif type_response == 'cancel':
+                    db_query.update_cancel_today(update_item, telegram_id)
+
+    @staticmethod
     def get_msg_plus(items_today, today_list, nm_id, comission):
         # Склеиваем заказы с одинаковым артикулом
         msg_plus = '\n\n➕ в том числе 👇🏻\n\n'
@@ -216,10 +248,7 @@ class Notifications:
 
         return msg_plus
 
-    def order_cheking(self, type, telegram_id, api_key_number, api_key):
-        orders_3_month = api_query.get_orders(api_key, '3_month')
-        sales_3_month = api_query.get_sales(api_key, '3_month')
-        stock = api_query.get_stock(api_key)
+    def order_cheking(self, type, telegram_id, api_key_number, api_key, stock, orders_3_month, sales_3_month):
         rezerv_days = int(db_query.select_rezerv(telegram_id).split('|')[api_key_number])
         ip_name = db_query.select_ip_name(telegram_id).split('|')
 
@@ -231,9 +260,18 @@ class Notifications:
                 orders_1_month.append(order)
 
         if type == 'order':
+            items_list_today, items_list_yesterday = self.get_items_lists(orders_3_month)
+        elif type == 'sale':
+            items_list_today, items_list_yesterday = self.get_items_lists(sales_3_month)
+        elif type == 'cancel':
+            canceled_3_month = self.get_cancel_list(orders_3_month, sales_3_month)
+            items_list_today, items_list_yesterday = self.get_items_lists(canceled_3_month)
+
+        self.update_item_tooday(items_list_today, telegram_id, api_key_number, type)
+
+        if type == 'order':
             today_list_full = db_query.select_orders_today(telegram_id).split('|')
             today_list = today_list_full[api_key_number].split(',')
-            items_list_today, items_list_yesterday = self.get_items_lists(orders_3_month)
         elif type == 'sale':
             today_list_full = db_query.select_sales_today(telegram_id).split('|')
             today_list = today_list_full[api_key_number].split(',')
@@ -241,14 +279,12 @@ class Notifications:
         elif type == 'cancel':
             today_list_full = db_query.select_cancel_today(telegram_id).split('|')
             today_list = today_list_full[api_key_number].split(',')
-            canceled_3_month = self.get_cancel_list(orders_3_month, sales_3_month)
-            items_list_today, items_list_yesterday = self.get_items_lists(canceled_3_month)
 
         for item in items_list_today:
             nm_id, order_number, date_order, subject, barcode, category, brand, \
                 amount, supplier_article, address, date_order_for_msg = self.get_item_data(item)
 
-            if order_number not in today_list:
+            if not (order_number in today_list):
                 if 'none' in today_list:
                     today_list = [order_number]
                 else:
@@ -334,3 +370,4 @@ class Notifications:
                       f'{msg_plus}'
 
                 bot.send_photo(telegram_id, img, msg, parse_mode='html')
+

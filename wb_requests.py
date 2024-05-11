@@ -111,7 +111,6 @@ class ApiRequest:
             date_from = self.get_3_month_ago_date()
         headers = self.get_header(api_key)
         url = f'https://statistics-api.wildberries.ru/api/v1/supplier/orders?dateFrom={date_from}&dateTo={today_date}'
-        print(url)
         response = self.session.get(url, headers=headers).json()
         return response
 

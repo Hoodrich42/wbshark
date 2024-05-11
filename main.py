@@ -43,9 +43,12 @@ def check_notifications():
             for api_key in api_keys_list:
                 if api_key != 'none':
                     api_key_number = api_keys_list.index(api_key)
-                    notifications.order_cheking('order', telegram_id, api_key_number, api_key)
-                    # notifications.order_cheking('sale', telegram_id, api_key_number, api_key)
-                    # notifications.order_cheking('cancel', telegram_id, api_key_number, api_key)
+                    stock = api_query.get_stock(api_key)
+                    orders_3_month = api_query.get_orders(api_key, '3_month')
+                    sales_3_month = api_query.get_sales(api_key, '3_month')
+                    notifications.order_cheking('order', telegram_id, api_key_number, api_key, stock, orders_3_month, sales_3_month)
+                    notifications.order_cheking('sale', telegram_id, api_key_number, api_key, stock, orders_3_month, sales_3_month)
+                    notifications.order_cheking('cancel', telegram_id, api_key_number, api_key, stock, orders_3_month, sales_3_month)
                     #bot.send_message(telegram_id, msg)
                     time.sleep(1)
         time.sleep(3600)
