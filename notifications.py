@@ -16,7 +16,7 @@ class Notifications:
     @staticmethod
     def get_comission():
         dict_categories = {}
-        comission_file = pd.ExcelFile('сomission.xlsx')
+        comission_file = pd.ExcelFile('test_bot/сomission.xlsx')
         comission_file = comission_file.parse()
         for i in comission_file['Категория']:
             if i in dict_categories.keys():
@@ -223,7 +223,7 @@ class Notifications:
                     db_query.update_cancel_today(update_item, telegram_id)
 
     @staticmethod
-    def get_msg_plus(items_today, today_list, nm_id, comission):
+    def get_msg_plus(items_today, today_list, nm_id, comission, type):
         # Склеиваем заказы с одинаковым артикулом
         msg_plus = '\n\n➕ в том числе 👇🏻\n\n'
         count_plus = 0
@@ -236,8 +236,14 @@ class Notifications:
                                           f'{items_today[i]["date"].split("T")[0].split("-")[0]} ' \
                                           f'{items_today[i]["date"].split("T")[1]}'
                 address_plus = f'🌐 {items_today[i]["warehouseName"]} → {items_today[i]["regionName"]}'
+                if type == 'order':
+                    third_str = f'🛒Заказ[{len(today_list)}]: {int(items_today[i]["priceWithDisc"])}₽\n'
+                if type == 'sale':
+                    third_str = f'✅ Выкуп[{len(today_list)}]: {int(items_today[i]["priceWithDisc"])}₽\n'
+                if type == 'cancel':
+                    third_str = f'🚫 Отмена[{len(today_list)}]: {int(items_today[i]["priceWithDisc"])}₽\n'
                 msg_plus += f'{date_order_for_msg_plus}\n' \
-                            f'🛒Заказ[{len(today_list)}]: {int(items_today[i]["priceWithDisc"])}₽\n' \
+                            f'{third_str}' \
                             f'💼 Комиссия (базовая): {comission}%\n' \
                             f'{address_plus}\n\n'
                 if count_plus == 4:
@@ -250,6 +256,7 @@ class Notifications:
 
     def order_cheking(self, type, telegram_id, api_key_number, api_key, stock, orders_3_month, sales_3_month):
         rezerv_days = int(db_query.select_rezerv(telegram_id).split('|')[api_key_number])
+        short_mode = db_query.select_short_mode(telegram_id).split('|')[api_key_number]
         ip_name = db_query.select_ip_name(telegram_id).split('|')
 
         month_ago_dates = self.get_month_ago_dates()
@@ -317,7 +324,7 @@ class Notifications:
                 # Резерв
                 rezerv_kolich = self.rezerv_calculate(orders_1_month, nm_id, summ, rezerv_days)
 
-                msg_plus = self.get_msg_plus(items_list_today, today_list, nm_id, comission)
+                msg_plus = self.get_msg_plus(items_list_today, today_list, nm_id, comission, type)
 
                 # Обновляем список заказов за сегодня в базе данных
                 updated_items_today = ''
@@ -346,28 +353,42 @@ class Notifications:
                     db_query.update_cancel_today(updated_items_today_list, telegram_id)
                     third_str = f'🚫 Отмена[{items_count}]: {amount}₽\n'
 
-                msg = f'{ip_name[api_key_number]}\n\n' \
-                      f'{date_order_for_msg}\n' \
-                      f'{third_str}' \
-                      f'📈 Сегодня: {all_today}\n' \
-                      f'🆔 Арт: <a href="https://www.wildberries.ru/catalog/{nm_id}/detail.aspx?targetUrl=XS">{nm_id}</a>\n' \
-                      f'📁{subject}\n' \
-                      f'🏷{brand} \ <a href="https://www.wildberries.ru/catalog/{nm_id}/detail.aspx?targetUrl=XS">{supplier_article}</a>\n' \
-                      f'#️⃣ Баркод: {barcode}\n' \
-                      f'⭐️ Рейтинг: {rate}\n' \
-                      f'💬 Отзывы: {reviews}\n' \
-                      f'💵 Сегодня таких: {cur_artikul_today}\n' \
-                      f'💶 Вчера таких: {cur_artikul_yesterday}\n' \
-                      f'{abc_analyz}' \
-                      f'💼 Комиссия (базовая): {comission}%\n' \
-                      f'{vykup}' \
-                      f'{address}\n' \
-                      f'🚛 В пути до клиента: {sum_to_klient}\n' \
-                      f'🚚 В пути возвраты: {sum_from_klient}\n\n' \
-                      f'{all_sklad}' \
-                      f'📦 Всего: {summ}\n' \
-                      f'🚗 Пополните склад на {int(rezerv_kolich)} шт.' \
-                      f'{msg_plus}'
+                if short_mode == 'true':
+                    msg = f'{ip_name[api_key_number]}\n\n' \
+                          f'{date_order_for_msg}\n' \
+                          f'{third_str}' \
+                          f'📈 Сегодня: {all_today}\n' \
+                          f'🆔 Арт: <a href="https://www.wildberries.ru/catalog/{nm_id}/detail.aspx?targetUrl=XS">{nm_id}</a> ' \
+                          f'(<a href="https://www.wildberries.ru/catalog/{nm_id}/detail.aspx?targetUrl=XS">{supplier_article}</a>)\n' \
+                          f'📁{subject}\n' \
+                          f'{address}\n\n' \
+                          f'{all_sklad}' \
+                          f'📦 Всего: {summ}\n' \
+                          f'🚗 Пополните склад на {int(rezerv_kolich)} шт.' \
+                          f'{msg_plus}'
+                else:
+                    msg = f'{ip_name[api_key_number]}\n\n' \
+                          f'{date_order_for_msg}\n' \
+                          f'{third_str}' \
+                          f'📈 Сегодня: {all_today}\n' \
+                          f'🆔 Арт: <a href="https://www.wildberries.ru/catalog/{nm_id}/detail.aspx?targetUrl=XS">{nm_id}</a>\n' \
+                          f'📁{subject}\n' \
+                          f'🏷{brand} \ <a href="https://www.wildberries.ru/catalog/{nm_id}/detail.aspx?targetUrl=XS">{supplier_article}</a>\n' \
+                          f'#️⃣ Баркод: {barcode}\n' \
+                          f'⭐️ Рейтинг: {rate}\n' \
+                          f'💬 Отзывы: {reviews}\n' \
+                          f'💵 Сегодня таких: {cur_artikul_today}\n' \
+                          f'💶 Вчера таких: {cur_artikul_yesterday}\n' \
+                          f'{abc_analyz}' \
+                          f'💼 Комиссия (базовая): {comission}%\n' \
+                          f'{vykup}' \
+                          f'{address}\n' \
+                          f'🚛 В пути до клиента: {sum_to_klient}\n' \
+                          f'🚚 В пути возвраты: {sum_from_klient}\n\n' \
+                          f'{all_sklad}' \
+                          f'📦 Всего: {summ}\n' \
+                          f'🚗 Пополните склад на {int(rezerv_kolich)} шт.' \
+                          f'{msg_plus}'
 
                 bot.send_photo(telegram_id, img, msg, parse_mode='html')
 

@@ -13,8 +13,8 @@ class DbRequest():
 
     def insert_db(self, telegram_id):
         connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
-        insert_dannye = (str(telegram_id), 'none|none', 'none|none', 'none|none', 'none|none', 'none|none')
-        sql_query = 'INSERT INTO shark_table(telegram_id, api_key, ip_name, orders_today, sales_today, cancel_today) VALUES(%s, %s, %s, %s, %s, %s)'
+        insert_dannye = (str(telegram_id), 'none|none', 'none|none', 'none|none', 'none|none', 'none|none', '7|7', 'false|false')
+        sql_query = 'INSERT INTO shark_table(telegram_id, api_key, ip_name, orders_today, sales_today, cancel_today, rezerv, short_mode) VALUES(%s, %s, %s, %s, %s, %s, %s, %s)'
         with connection.cursor() as cursor:
             cursor.execute(sql_query, insert_dannye)
             connection.commit()
@@ -145,6 +145,26 @@ class DbRequest():
         connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
         sql_query = "UPDATE shark_table SET rezerv = %s WHERE telegram_id = %s"
         values = (new_rezerv, str(telegram_id))
+        with connection.cursor() as cursor:
+            cursor.execute(sql_query, values)
+            connection.commit()
+        connection.close()
+
+    def select_short_mode(self, telegram_id):
+        connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
+        sql_query = "SELECT short_mode FROM shark_table WHERE telegram_id = %s"
+        values = (str(telegram_id),)
+        with connection.cursor() as cursor:
+            cursor.execute(sql_query, values)
+            short_mode = cursor.fetchall()[0][0]
+            connection.commit()
+        connection.close()
+        return short_mode
+
+    def update_short_mode(self, new_short_mode, telegram_id):
+        connection = psycopg2.connect(host=self.host, user=self.user, password=self.password, dbname=self.db_name)
+        sql_query = "UPDATE shark_table SET short_mode = %s WHERE telegram_id = %s"
+        values = (new_short_mode, str(telegram_id))
         with connection.cursor() as cursor:
             cursor.execute(sql_query, values)
             connection.commit()

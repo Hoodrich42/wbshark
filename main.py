@@ -46,12 +46,15 @@ def check_notifications():
                     stock = api_query.get_stock(api_key)
                     orders_3_month = api_query.get_orders(api_key, '3_month')
                     sales_3_month = api_query.get_sales(api_key, '3_month')
-                    notifications.order_cheking('order', telegram_id, api_key_number, api_key, stock, orders_3_month, sales_3_month)
-                    notifications.order_cheking('sale', telegram_id, api_key_number, api_key, stock, orders_3_month, sales_3_month)
-                    notifications.order_cheking('cancel', telegram_id, api_key_number, api_key, stock, orders_3_month, sales_3_month)
-                    #bot.send_message(telegram_id, msg)
-                    time.sleep(1)
-        time.sleep(3600)
+                    try:
+                        notifications.order_cheking('order', telegram_id, api_key_number, api_key, stock, orders_3_month, sales_3_month)
+                        notifications.order_cheking('sale', telegram_id, api_key_number, api_key, stock, orders_3_month, sales_3_month)
+                        notifications.order_cheking('cancel', telegram_id, api_key_number, api_key, stock, orders_3_month, sales_3_month)
+                    except:
+                        print(stock)
+                        print(orders_3_month)
+                        print(sales_3_month)
+        time.sleep(1800)
 
 
 @bot.message_handler(commands=['start'])
@@ -96,6 +99,39 @@ def kabinet(message):
     ip_name_list = db_query.select_ip_name(message.from_user.id).split('|')
     bot.send_message(message.chat.id, text=f'🐲 Личный кабинет \n\n· ID: {message.from_user.id}\n\n· Магазины: {len(ip_name_list)}', reply_markup=kabinet_markup)
 
+@bot.message_handler(commands=['tarif'])
+def tariff(message):
+    msg = f'Стоимость тарифа зависит от количества заказов за 30 дней до расчетной даты ' \
+          f'(пересчитывается 1 раз в месяц в расчетный день, независимо от даты пополнения баланса). \n\n' \
+          f'Ваша оплата в зависимости от количества заказов в месяц составит:\n\n' \
+          f'От 1 до 300 = 190₽ / мес\n\n' \
+          f'От 301 до 1000 = 390₽ / мес\n\n' \
+          f'От 1001 до 3000 = 690₽ / мес\n\n' \
+          f'От 3001 до 10 000 = 1090₽ / мес\n\n' \
+          f'От 10 001 = 1 490 ₽ / мес'
+    bot.send_message(message.chat.id, text=f'{msg}')
+
+@bot.message_handler(commands=['short'])
+def short(message):
+    short_markup = types.InlineKeyboardMarkup()
+    btn1 = types.InlineKeyboardButton('Настроить режим минимума', callback_data='short_mode_from_command')
+    short_markup.add(btn1)
+    msg = f'Информация о режиме минимум 👇\n\n' \
+          f'Короткие оповещения о заказах и выкупах: \n' \
+          f'- ИП заказа \n' \
+          f'- 🕐 Дата и время заказа \n' \
+          f'- 🛒 Номер заказа \n' \
+          f'- 📈 Сколько всего таких заказов \n' \
+          f'- 🆔 Артикул ВБ \n' \
+          f'- 📁 Категория товара \n' \
+          f'- 🌐 Логистика \n' \
+          f'- 📦 Остатки товара на складах»\n\n' \
+          f'Отключить данный режим вы сможете в личном кабинете в настройках'
+    bot.send_message(message.chat.id, text=f'{msg}', reply_markup=short_markup)
+
+@bot.message_handler(commands=['reports'])
+def reports(message):
+    msg = bot.send_message(message.chat.id, 'Загружаю...⏳')
 
 @bot.message_handler(content_types=['text'])
 def add_api_key(message):
@@ -116,7 +152,6 @@ def add_api_key(message):
             ip_name = api_query.api_ip(nm_id, api_key)
             api_keys_list = db_query.select_api_key(telegram_id).split('|')
             ip_names_list = db_query.select_ip_name(telegram_id).split('|')
-            print(api_keys_list)
             if api_keys_list[0] == 'none' or api_keys_list[1] == 'none':
                 confirm_marup = types.InlineKeyboardMarkup()
                 if api_keys_list[0] == 'none':
@@ -172,10 +207,16 @@ def query_handler(call):
     if data[0] == 'settings':
         if len(data) > 1:
             rezerv = db_query.select_rezerv(call.from_user.id).split('|')[int(data[1])]
+            short_mode = db_query.select_short_mode(call.from_user.id).split('|')[int(data[1])]
+            if short_mode == 'true':
+                short_mode_txt = 'Вкл.'
+            elif short_mode == 'false':
+                short_mode_txt = 'Выкл.'
             settings_markup = types.InlineKeyboardMarkup()
             ip_name = db_query.select_ip_name(call.from_user.id).split('|')[int(data[1])]
             btn1 = types.InlineKeyboardButton(f'Резерв склада: {rezerv} дн.', callback_data=f'rezerv:{data[1]}')
-            settings_markup.add(btn1)
+            btn2 = types.InlineKeyboardButton(f'Короткие сообщения: {short_mode_txt}', callback_data=f'short_mode:{data[1]}')
+            settings_markup.add(btn1, btn2)
             bot.edit_message_text(f'⚙️ Настройки\n\n{ip_name}', call.message.chat.id, call.message.message_id, reply_markup=settings_markup)
         else:
             ip_name_list = db_query.select_ip_name(call.from_user.id).split('|')
@@ -250,7 +291,6 @@ def query_handler(call):
         deleted_ip = ip_names[cur_ip_name]
         ip_names[cur_ip_name] = 'none'
         updated_ip_names = ''
-        print(ip_names)
         for i in range(len(ip_names)):
             if i + 1 == len(ip_names):
                 updated_ip_names += f'{ip_names[i]}'
@@ -285,6 +325,39 @@ def query_handler(call):
         podrob_markup.add(btn1)
         bot.edit_message_text('🔑 API токен (ключ) Wildberries\n\nЕсли кратко, то API-токен — это идентификатор поставщика Wildberries, с помощью которого можно получать информацию о заказах, продажах, поступлениях, наличию на складах и другим данным конкретного поставщика, без доступа к личному кабинету. Далее на основе полученной информации можно строить аналитику.\n\nAPI-токен — это способ интегрирования с теми или иными сервисами, которые созданы для того, чтобы помочь поставщикам в работе с Wildberries. \n\nПреимущества API:\n\n✴️ С помощью API вы получаете детализированную информацию по продажам, заказам и поставкам. WB же в большинстве своих отчетов даёт лишь общую информацию. \n\n✴️ API безопасен и даёт возможность только получать данные, это значит, что вероятность изменения или какого-либо влияния на информацию исключена. \n\n✴️ Вы в любой момент можете сгенерировать новый API-токен в личном кабинете WB, а значит отменить доступ к статистическим данным для нашего бота или других сервисов.', call.message.chat.id, call.message.message_id, reply_markup=podrob_markup)
 
+    if data[0] == 'short_mode_from_command':
+        ip_name_list = db_query.select_ip_name(call.from_user.id).split('|')
+        cur_ip_markup = types.InlineKeyboardMarkup()
+        for i in range(len(ip_name_list)):
+            if ip_name_list[i] != 'none':
+                btn = types.InlineKeyboardButton(f'{ip_name_list[i]}', callback_data=f'short_mode:{i}')
+                cur_ip_markup.add(btn)
+        bot.edit_message_text(f'Выберите магазин:', call.message.chat.id, call.message.message_id, reply_markup=cur_ip_markup)
+
+    if data[0] == 'short_mode':
+        if len(data) < 3:
+            short_mode_murkup = types.InlineKeyboardMarkup()
+            btn1 = types.InlineKeyboardButton('Включить', callback_data=f'short_mode:{data[1]}:true')
+            btn2 = types.InlineKeyboardButton('Выключить', callback_data=f'short_mode:{data[1]}:false')
+            short_mode_murkup.add(btn1, btn2)
+            msg = f'Пример сообщения:\n\n' \
+                  f'🪙ИП\n\n' \
+                  f'15.03.2024 09:26:42\n' \
+                  f'🛒Заказ[26]: 210₽\n' \
+                  f'📈 Сегодня: 26 на 4438₽\n' \
+                  f'🆔 Арт: 123456789\n' \
+                  f'📁 Предмет\n' \
+                  f'🌐 Тула → Свердловская область\n\n' \
+                  f'📦 Тула: 42\n' \
+                  f'📦 Всего: 42'
+            bot.edit_message_text(text=f'{msg}', chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=short_mode_murkup)
+        else:
+            short_mode = db_query.select_short_mode(call.from_user.id).split('|')
+            short_mode[int(data[1])] = data[2]
+            short_mode = f'{short_mode[0]}|{short_mode[1]}'
+            db_query.update_short_mode(short_mode, call.from_user.id)
+            bot.edit_message_text(text=f'Настройки режима сообщений обновлены', chat_id=call.message.chat.id, message_id=call.message.message_id)
+
 
 thread1 = threading.Thread(target=check_notifications).start()
-bot.polling(non_stop=True, interval=0)
+bot.infinity_polling(timeout=10, long_polling_timeout = 5)
