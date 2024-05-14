@@ -6,6 +6,7 @@ from notifications import Notifications
 from dotenv import load_dotenv
 from db_requests import *
 from wb_requests import *
+from report import *
 
 load_dotenv()
 
@@ -15,6 +16,8 @@ bot = telebot.TeleBot(bot_token)
 db_query = DbRequest()
 api_query = ApiRequest()
 notifications = Notifications()
+report = Report()
+
 
 def check_request(response):
     fl_api = False
@@ -131,7 +134,15 @@ def short(message):
 
 @bot.message_handler(commands=['reports'])
 def reports(message):
+    telegram_id = message.from_user.id
+    api_key = db_query.select_api_key(telegram_id).split('|')[0]
+    ip_name = db_query.select_ip_name(telegram_id).split('|')[0]
     msg = bot.send_message(message.chat.id, 'Загружаю...⏳')
+    orders_30_days = api_query.get_orders(api_key, '30_days')
+    sales_30_days = api_query.get_sales(api_key, '30_days')
+    msg_txt = report.report(orders_30_days, sales_30_days, telegram_id, ip_name)
+    bot.edit_message_text(msg_txt, message.chat.id, msg.message_id)
+
 
 @bot.message_handler(content_types=['text'])
 def add_api_key(message):
@@ -360,4 +371,4 @@ def query_handler(call):
 
 
 thread1 = threading.Thread(target=check_notifications).start()
-bot.infinity_polling(timeout=10, long_polling_timeout = 5)
+bot.infinity_polling(timeout=10, long_polling_timeout=5)

@@ -273,6 +273,7 @@ class Notifications:
         elif type == 'cancel':
             canceled_3_month = self.get_cancel_list(orders_3_month, sales_3_month)
             items_list_today, items_list_yesterday = self.get_items_lists(canceled_3_month)
+            print(items_list_today)
 
         self.update_item_tooday(items_list_today, telegram_id, api_key_number, type)
 
